@@ -7,12 +7,15 @@ ARG PORT=3000
 
 COPY package.json .
 COPY bun.lockb .
-
-RUN bun install --production
-
+COPY drizzle.config.ts .
 COPY src src
 COPY tsconfig.json .
-# COPY public public
+
+RUN bun install
+
+RUN bun drizzle-kit push
+
+RUN bun install --production
 
 # กำหนดค่า ENV จาก ARG
 ENV PORT=${PORT}
@@ -22,4 +25,4 @@ ENV NODE_ENV production
 EXPOSE ${PORT}
 
 # ส่งค่า port ให้แอปพลิเคชัน
-CMD ["sh", "-c", "bun src/index.ts"]
+CMD ["bun", "src/index.ts"]

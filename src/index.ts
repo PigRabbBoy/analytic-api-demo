@@ -1,9 +1,10 @@
 import { Elysia, t } from "elysia";
-import { drizzle } from "drizzle-orm/bun-sqlite";
+import { drizzle, } from "drizzle-orm/bun-sqlite";
 import { Database } from "bun:sqlite";
 import { randomUUIDv7 } from "bun";
 import { analyticTable } from "./database";
 import { swagger } from "@elysiajs/swagger";
+import {  desc } from 'drizzle-orm';
 
 const sqlite = new Database("database.db");
 const db = drizzle({ client: sqlite });
@@ -17,22 +18,52 @@ app.get("/", () => "Hello Elysia");
 app.post(
   "/analytic",
   async (req) => {
-    const body = req.body as any;
+    const body = req.body;
     const id = randomUUIDv7();
 
-    // await db.insert(analyticTable).values({})
+    await db.insert(analyticTable).values({
+      id,
+      userId: body.userId,
+      data: body.data,
+      createdAt: new Date().toISOString(),
+    });
+    return { status: "ok", id };
   },
   {
     body: t.Object({
-      userId: t.String(),
-      data: t.Any(),
+      userId: t.String({
+        description: "ไอดีของ user",
+      }),
+      data: t.Any({ description: "ข้อมูลที่ต้องการเก็บ" }),
     }),
   }
 );
 
-app.get("/analytic", (req) => {}, {
-qurey:{}
-});
+app.get(
+  "/analytic",
+  async (req) => {
+    const query = req.query;
+    const page = query.page;
+    const pageSize = query.pageSize;
+    const offset = (page - 1) * pageSize;
+    const limit = pageSize;
+    const data = await db
+      .select()
+      .from(analyticTable)
+      .limit(limit)
+      .offset(offset).orderBy(desc(analyticTable.createdAt))
+
+    return {
+      data,
+    };
+  },
+  {
+    query: t.Object({
+      page: t.Number({ description: "หน้า" }),
+      pageSize: t.Number({ description: "จำนวนต่อหน้า" }),
+    }),
+  }
+);
 
 const port = Bun.env.PORT ? +Bun.env.PORT : 4000;
 app.listen(port);
