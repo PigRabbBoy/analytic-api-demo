@@ -1,10 +1,10 @@
 import { Elysia, t } from "elysia";
-import { drizzle, } from "drizzle-orm/bun-sqlite";
+import { drizzle } from "drizzle-orm/bun-sqlite";
 import { Database } from "bun:sqlite";
 import { randomUUIDv7 } from "bun";
 import { analyticTable } from "./database";
 import { swagger } from "@elysiajs/swagger";
-import {  desc } from 'drizzle-orm';
+import { desc } from "drizzle-orm";
 
 const sqlite = new Database("database.db");
 const db = drizzle({ client: sqlite });
@@ -19,15 +19,18 @@ app.post(
   "/analytic",
   async (req) => {
     const body = req.body;
-    const id = randomUUIDv7();
+    const data = Array.isArray(body.data) ? body.data : [body.data];
+    const createdAt = new Date().toISOString()
 
-    await db.insert(analyticTable).values({
-      id,
-      userId: body.userId,
-      data: body.data,
-      createdAt: new Date().toISOString(),
-    });
-    return { status: "ok", id };
+    await db.insert(analyticTable).values(
+      data.map((v) => ({
+        id: randomUUIDv7(),
+        userId: body.userId,
+        data: v,
+        createdAt,
+      }))
+    );
+    return { status: "ok" };
   },
   {
     body: t.Object({
@@ -51,7 +54,8 @@ app.get(
       .select()
       .from(analyticTable)
       .limit(limit)
-      .offset(offset).orderBy(desc(analyticTable.createdAt))
+      .offset(offset)
+      .orderBy(desc(analyticTable.createdAt));
 
     return {
       data,
