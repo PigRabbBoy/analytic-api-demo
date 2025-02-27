@@ -1,28 +1,34 @@
-FROM oven/bun
+FROM node:lts
 
 WORKDIR /app
 
-# กำหนด ARG ที่สามารถรับค่าจากภายนอกตอน build
 ARG PORT=3000
 
+# ติดตั้ง Bun
+RUN curl -fsSL https://bun.sh/install | bash
+ENV PATH="/root/.bun/bin:$PATH"
+
+# ติดตั้ง Python และ build-essential
+RUN apt update && apt install -y python3 python3-pip build-essential
+
 COPY package.json .
-COPY bun.lockb .
+COPY bun.lock .
 COPY drizzle.config.ts .
 COPY src src
 COPY tsconfig.json .
 
+# ใช้ Bun เพื่อจัดการ dependencies ทั่วไป
 RUN bun install
 
-RUN bun drizzle-kit push
+# ติดตั้ง better-sqlite3 โดยใช้ npm สำหรับการคอมไพล์
+RUN npm install better-sqlite3
 
+RUN bun drizzle-kit push
 RUN bun install --production
 
-# กำหนดค่า ENV จาก ARG
 ENV PORT=${PORT}
 ENV NODE_ENV production
 
-# ใช้ค่า PORT ใน EXPOSE
 EXPOSE ${PORT}
 
-# ส่งค่า port ให้แอปพลิเคชัน
 CMD ["bun", "src/index.ts"]
