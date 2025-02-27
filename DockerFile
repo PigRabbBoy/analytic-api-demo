@@ -1,0 +1,25 @@
+FROM oven/bun
+
+WORKDIR /app
+
+# กำหนด ARG ที่สามารถรับค่าจากภายนอกตอน build
+ARG PORT=3000
+
+COPY package.json .
+COPY bun.lockb .
+
+RUN bun install --production
+
+COPY src src
+COPY tsconfig.json .
+# COPY public public
+
+# กำหนดค่า ENV จาก ARG
+ENV PORT=${PORT}
+ENV NODE_ENV production
+
+# ใช้ค่า PORT ใน EXPOSE
+EXPOSE ${PORT}
+
+# ส่งค่า port ให้แอปพลิเคชัน
+CMD ["sh", "-c", "bun src/index.ts"]
