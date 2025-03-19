@@ -24,7 +24,7 @@ RUN bun install
 RUN npm install better-sqlite3
 
 RUN bun drizzle-kit push
-RUN bun install --production
+RUN bun install
 
 ENV PORT=${PORT}
 ENV NODE_ENV production
