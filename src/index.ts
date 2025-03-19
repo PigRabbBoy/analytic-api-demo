@@ -2,14 +2,14 @@ import { Elysia, t } from "elysia";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { Database } from "bun:sqlite";
 import { randomUUIDv7 } from "bun";
-import { analyticTable, userTable } from "./database";
+import { analyticTable, settingTable, systemConfig } from "./database";
 import { swagger } from "@elysiajs/swagger";
 import { desc, eq } from "drizzle-orm";
 
 const sqlite = new Database("database.db");
 const db = drizzle({
   client: sqlite,
-  schema: { user: userTable, analytic: analyticTable },
+  schema: { setting: settingTable, analytic: analyticTable, systemConfig },
 });
 
 const app = new Elysia();
@@ -18,94 +18,39 @@ app.use(swagger());
 
 app.get("/", () => "Hello Elysia");
 
-app.get("token", async () => {
-  const ohoUserId = randomUUIDv7();
-
-  await db.insert(userTable).values({
-    ohoId: ohoUserId,
-  });
-  const token = btoa(ohoUserId);
-
-  return { token, ohoUserId };
-});
-
-app.post(
-  "auth",
-  async (req) => {
-    const body = req.body;
-
-    let token = body.ohoToken;
-    let ohoUserId: string;
-    if (token) {
-      ohoUserId = atob(token);
-      const user = await db.query.user.findFirst({
-        where: eq(userTable.ohoId, ohoUserId),
-      });
-
-      if (!user) {
-        return req.error("Not Found", "user not found");
-      }
-
-      if (user.userId && user.userId !== body.userId) {
-        return req.error("Conflict", "user already auth");
-      }
-
-      const auth = await db.query.user.findFirst({
-        where: eq(userTable.userId, body.userId),
-      });
-
-      if (auth && auth.userId !== body.userId) {
-        return req.error("Conflict", "user already auth");
-      }
-
-      await db
-        .update(userTable)
-        .set({
-          userId: body.userId,
-          data: body.data,
-        })
-        .where(eq(userTable.ohoId, ohoUserId));
-    } else {
-      ohoUserId = randomUUIDv7();
-      token = btoa(ohoUserId);
-
-      await db.insert(userTable).values({
-        ohoId: ohoUserId,
-        userId: body.userId,
-        data: body.data,
-      });
-    }
-
-    return { token, ohoUserId };
-  },
-  {
-    body: t.Object({
-      userId: t.String({ description: "ไอดี user ของ website" }),
-      ohoToken: t.Optional(t.String({ description: "token ของ oho" })),
-      data: t.Optional(t.Any({ description: "ข้อมูล user ของ website" })),
-    }),
-  }
-);
-
 const analyticObj = t.Object({
-  type: t.String(),
-  ohoPixel: t.String(),
-  clientId: t.String(),
-  user: t.Optional(t.Any()),
-  data: t.Optional(t.Any()),
-  timestamp: t.String(),
+  ohoPixelId: t.String({ default: "0195a85c-3ae3-79b2-8489-c2006dc0a488" }),
+  clientId: t.String({ default: "0195a85c-5980-723a-a504-3e9a66958f30" }),
+  sessionId: t.Optional(
+    t.String({ default: "0195a85c-7253-7378-9181-2e26623f390f" })
+  ),
+  chatUser: t.Optional(t.Any({ default: { userId: "user1234" } })),
+  authUser: t.Optional(
+    t.Any({
+      default: {
+        authUser: {
+          userId: "1234",
+          email: "email",
+        },
+      },
+    })
+  ),
+  type: t.String({ default: "event:page:startChat" }),
+  buttonClick: t.Optional(t.Any()),
+  userData: t.Optional(t.Any()),
+  ads: t.Optional(t.Any()),
+  page: t.Optional(t.Any()),
+  timestamp: t.String({ default: new Date().toISOString() }),
 });
 
 app.post(
-  "/analytic",
+  "/tracking",
   async (req) => {
     const body = req.body;
-    const data = body.list;
-    if (!data) return { status: "data not found" };
     const createdAt = new Date().toISOString();
 
     await db.insert(analyticTable).values(
-      data.map((v) => ({
+      [body].map((v) => ({
         id: randomUUIDv7(),
         createdAt,
         ...v,
@@ -114,14 +59,12 @@ app.post(
     return { status: "ok" };
   },
   {
-    body: t.Object({
-      list: t.Array(analyticObj, { minItems: 1 }),
-    }),
+    body: analyticObj,
   }
 );
 
 app.get(
-  "/analytic",
+  "/tracking",
   async (req) => {
     const query = req.query;
     const page = query.page;
@@ -144,6 +87,147 @@ app.get(
       page: t.Number({ description: "หน้า", default: 1 }),
       pageSize: t.Number({ description: "จำนวนต่อหน้า", default: 20 }),
     }),
+  }
+);
+
+app.get("/setting/:id", async (req) => {
+  const id = req.params.id;
+
+  const setting = await db.query.setting.findFirst({
+    where: eq(settingTable.ohoPixelId, id),
+  });
+
+  if (!setting) {
+    req.set.status = "Not Found";
+    return;
+  }
+
+  return setting;
+});
+
+const livechat = t.Object({
+  enable: t.Boolean({ default: true }),
+  config: t.Any({
+    default: {
+      logoUrl: "url for chat logo image",
+      greetingMessage: "hello chat",
+      triggerAfter: 10,
+      requireEmail: true,
+      requireTel: true,
+    },
+  }),
+});
+
+const tracking = t.Object({
+  enable: t.Boolean({ default: true }),
+  config: t.Any({
+    default: {
+      eventMappings: {
+        userData: "event:userdata",
+        pageView: "event:page:vioew",
+        ads: "event:ads",
+        buttonClick: "event:button:click",
+        chatOpen: "event:chat:open",
+      },
+      autoTrackPageView: true,
+      autoTrackButtonClick: true,
+      clickOpenChatSelector: ["a#add-to-cart"],
+    },
+  }),
+});
+
+app.put(
+  "/setting/:id",
+  async (req) => {
+    const id = req.params.id;
+
+    let setting = await db.query.setting.findFirst({
+      where: eq(settingTable.ohoPixelId, id),
+    });
+
+    if (!setting) {
+      req.set.status = "Not Found";
+      return;
+    }
+
+    await db
+      .update(settingTable)
+      .set({
+        ...req.body,
+      })
+      .where(eq(settingTable.ohoPixelId, id));
+
+    return setting;
+  },
+  {
+    body: t.Object({
+      livechat,
+      tracking,
+    }),
+  }
+);
+
+app.post(
+  "/setting/",
+  async (req) => {
+    const id = req.body.ohoPixelId;
+    let setting = await db.query.setting.findFirst({
+      where: eq(settingTable.ohoPixelId, id),
+    });
+
+    if (setting) {
+      req.set.status = "Conflict";
+      return;
+    }
+
+    await db.insert(settingTable).values(req.body);
+
+    return setting;
+  },
+  {
+    body: t.Object({
+      ohoPixelId: t.String({ default: "1234" }),
+      livechat,
+      tracking,
+    }),
+  }
+);
+
+app.get("/domain-whitelist", async (req) => {
+  const name = "domain";
+  const condition = eq(systemConfig.name, name);
+  const sysConf = await db.query.systemConfig.findFirst({
+    where: condition,
+  });
+
+  if (!sysConf) {
+    req.set.status = "Not Found";
+    return;
+  }
+
+  return { domain: sysConf.config };
+});
+
+app.put(
+  "/domain-whitelist",
+  async (req) => {
+    const name = "domain";
+    const domain = req.body.domain;
+    const condition = eq(systemConfig.name, name);
+    const sysConf = await db.query.systemConfig.findFirst({
+      where: condition,
+    });
+
+    if (sysConf) {
+      await db.update(systemConfig).set({ config: domain }).where(condition);
+    } else {
+      await db.insert(systemConfig).values({ name, config: domain });
+    }
+
+    return { domain: req.body.domain };
+  },
+  {
+    body: t.Object({ domain: t.Array(t.String()) }),
   }
 );
 
