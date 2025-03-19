@@ -18,13 +18,13 @@ export const analyticTable = sqliteTable("analytic", {
   createdAt: text("created_at"),
 });
 
-export const settingTable = sqliteTable("analytic", {
+export const settingTable = sqliteTable("setting", {
   ohoPixelId: text("oho_pixel_id").primaryKey(),
   livechat: blob({ mode: "json" }),
   tracking: blob({ mode: "json" }),
 });
 
-export const systemConfig = sqliteTable("analytic", {
+export const systemConfig = sqliteTable("system_config", {
   name: text().primaryKey(),
   config: blob({ mode: "json" }),
 });
