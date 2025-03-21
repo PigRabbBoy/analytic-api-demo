@@ -2,14 +2,18 @@ import { Elysia, t } from "elysia";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { Database } from "bun:sqlite";
 import { randomUUIDv7 } from "bun";
-import { analyticTable, settingTable, systemConfig } from "./database";
+import { analyticTable, settingTable, domainWhitelistTable } from "./database";
 import { swagger } from "@elysiajs/swagger";
 import { desc, eq } from "drizzle-orm";
 
 const sqlite = new Database("database.db");
 const db = drizzle({
   client: sqlite,
-  schema: { setting: settingTable, analytic: analyticTable, systemConfig },
+  schema: {
+    setting: settingTable,
+    analytic: analyticTable,
+    domainWhitelist: domainWhitelistTable,
+  },
 });
 
 const app = new Elysia();
@@ -47,8 +51,21 @@ app.post(
   "/tracking",
   async (req) => {
     const body = req.body;
-    const createdAt = new Date().toISOString();
 
+    const origin = req.headers.origin;
+    if (origin) {
+      const ohoPixelId = body.ohoPixelId;
+      const domainWhitelist = await db.query.domainWhitelist.findFirst({
+        where: eq(domainWhitelistTable.ohoPixelId, ohoPixelId),
+      });
+
+      if (!(domainWhitelist?.config ?? []).includes(origin)) {
+        req.set.status = "Unauthorized";
+        return
+      }
+    }
+
+    const createdAt = new Date().toISOString();
     await db.insert(analyticTable).values(
       [body].map((v) => ({
         id: randomUUIDv7(),
@@ -90,11 +107,23 @@ app.get(
   }
 );
 
-app.get("/setting/:id", async (req) => {
-  const id = req.params.id;
+app.get("/setting/:ohoPixelId", async (req) => {
+  const ohoPixelId = req.params.ohoPixelId;
+
+  const origin = req.headers.origin;
+  if (origin) {
+    const domainWhitelist = await db.query.domainWhitelist.findFirst({
+      where: eq(domainWhitelistTable.ohoPixelId, ohoPixelId),
+    });
+
+    if (!(domainWhitelist?.config ?? []).includes(origin)) {
+      req.set.status = "Unauthorized";
+      return
+    }
+  }
 
   const setting = await db.query.setting.findFirst({
-    where: eq(settingTable.ohoPixelId, id),
+    where: eq(settingTable.ohoPixelId, ohoPixelId),
   });
 
   if (!setting) {
@@ -137,12 +166,12 @@ const tracking = t.Object({
 });
 
 app.put(
-  "/setting/:id",
+  "/setting/:ohoPixelId",
   async (req) => {
-    const id = req.params.id;
+    const ohoPixelId = req.params.ohoPixelId;
 
     let setting = await db.query.setting.findFirst({
-      where: eq(settingTable.ohoPixelId, id),
+      where: eq(settingTable.ohoPixelId, ohoPixelId),
     });
 
     if (!setting) {
@@ -155,7 +184,7 @@ app.put(
       .set({
         ...req.body,
       })
-      .where(eq(settingTable.ohoPixelId, id));
+      .where(eq(settingTable.ohoPixelId, ohoPixelId));
 
     return setting;
   },
@@ -168,11 +197,11 @@ app.put(
 );
 
 app.post(
-  "/setting/",
+  "/setting",
   async (req) => {
-    const id = req.body.ohoPixelId;
+    const ohoPixelId = req.body.ohoPixelId;
     let setting = await db.query.setting.findFirst({
-      where: eq(settingTable.ohoPixelId, id),
+      where: eq(settingTable.ohoPixelId, ohoPixelId),
     });
 
     if (setting) {
@@ -181,6 +210,7 @@ app.post(
     }
 
     await db.insert(settingTable).values(req.body);
+    await db.insert(domainWhitelistTable).values({ ohoPixelId, config: [] });
 
     return setting;
   },
@@ -193,9 +223,10 @@ app.post(
   }
 );
 
-app.get("/domain-whitelist", async (req) => {
+app.get("/domain-whitelist/:ohoPixelId", async (req) => {
+  const ohoPixelId = req.params.ohoPixelId;
   const name = "domain";
-  const condition = eq(systemConfig.name, name);
+  const condition = eq(domainWhitelistTable.ohoPixelId, id);
   const sysConf = await db.query.systemConfig.findFirst({
     where: condition,
   });
@@ -209,19 +240,22 @@ app.get("/domain-whitelist", async (req) => {
 });
 
 app.put(
-  "/domain-whitelist",
+  "/domain-whitelist/:ohoPixelId",
   async (req) => {
     const name = "domain";
     const domain = req.body.domain;
-    const condition = eq(systemConfig.name, name);
+    const condition = eq(domainWhitelistTable.name, name);
     const sysConf = await db.query.systemConfig.findFirst({
       where: condition,
     });
 
     if (sysConf) {
-      await db.update(systemConfig).set({ config: domain }).where(condition);
+      await db
+        .update(domainWhitelistTable)
+        .set({ config: domain })
+        .where(condition);
     } else {
-      await db.insert(systemConfig).values({ name, config: domain });
+      await db.insert(domainWhitelistTable).values({ name, config: domain });
     }
 
     return { domain: req.body.domain };

@@ -1,4 +1,4 @@
-import { int, sqliteTable, text, blob } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, blob } from "drizzle-orm/sqlite-core";
 
 export const analyticTable = sqliteTable("analytic", {
   id: text().primaryKey(),
@@ -24,7 +24,7 @@ export const settingTable = sqliteTable("setting", {
   tracking: blob({ mode: "json" }),
 });
 
-export const systemConfig = sqliteTable("system_config", {
-  name: text().primaryKey(),
-  config: blob({ mode: "json" }),
+export const domainWhitelistTable = sqliteTable("domain_whitelist", {
+  ohoPixelId: text("oho_pixel_id").primaryKey(),
+  config: blob({ mode: "json" }).$type<string[]>(),
 });
