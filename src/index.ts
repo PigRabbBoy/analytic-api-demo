@@ -225,37 +225,36 @@ app.post(
 
 app.get("/domain-whitelist/:ohoPixelId", async (req) => {
   const ohoPixelId = req.params.ohoPixelId;
-  const name = "domain";
-  const condition = eq(domainWhitelistTable.ohoPixelId, id);
-  const sysConf = await db.query.systemConfig.findFirst({
+  const condition = eq(domainWhitelistTable.ohoPixelId, ohoPixelId);
+  const domainWhitelist = await db.query.domainWhitelist.findFirst({
     where: condition,
   });
 
-  if (!sysConf) {
+  if (!domainWhitelist) {
     req.set.status = "Not Found";
     return;
   }
 
-  return { domain: sysConf.config };
+  return { domain: domainWhitelist.config };
 });
 
 app.put(
   "/domain-whitelist/:ohoPixelId",
   async (req) => {
-    const name = "domain";
+    const ohoPixelId = req.params.ohoPixelId;
     const domain = req.body.domain;
-    const condition = eq(domainWhitelistTable.name, name);
-    const sysConf = await db.query.systemConfig.findFirst({
+    const condition = eq(domainWhitelistTable.ohoPixelId, ohoPixelId);
+    const domainWhitelist = await db.query.domainWhitelist.findFirst({
       where: condition,
     });
 
-    if (sysConf) {
+    if (domainWhitelist) {
       await db
         .update(domainWhitelistTable)
         .set({ config: domain })
         .where(condition);
     } else {
-      await db.insert(domainWhitelistTable).values({ name, config: domain });
+      await db.insert(domainWhitelistTable).values({ ohoPixelId, config: domain });
     }
 
     return { domain: req.body.domain };
