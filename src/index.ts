@@ -54,20 +54,20 @@ app.post(
 
     const origin = req.headers.origin;
     if (origin) {
-      const ohoPixelId = body.ohoPixelId;
+      const ohoPixelId = body.at(0)!.ohoPixelId;
       const domainWhitelist = await db.query.domainWhitelist.findFirst({
         where: eq(domainWhitelistTable.ohoPixelId, ohoPixelId),
       });
 
       if (!(domainWhitelist?.config ?? []).includes(origin)) {
         req.set.status = "Unauthorized";
-        return
+        return;
       }
     }
 
     const createdAt = new Date().toISOString();
     await db.insert(analyticTable).values(
-      [body].map((v) => ({
+      body.map((v) => ({
         id: randomUUIDv7(),
         createdAt,
         ...v,
@@ -76,7 +76,7 @@ app.post(
     return { status: "ok" };
   },
   {
-    body: analyticObj,
+    body: t.Array(analyticObj, { minItems: 1 }),
   }
 );
 
@@ -118,7 +118,7 @@ app.get("/setting/:ohoPixelId", async (req) => {
 
     if (!(domainWhitelist?.config ?? []).includes(origin)) {
       req.set.status = "Unauthorized";
-      return
+      return;
     }
   }
 
@@ -254,7 +254,9 @@ app.put(
         .set({ config: domain })
         .where(condition);
     } else {
-      await db.insert(domainWhitelistTable).values({ ohoPixelId, config: domain });
+      await db
+        .insert(domainWhitelistTable)
+        .values({ ohoPixelId, config: domain });
     }
 
     return { domain: req.body.domain };
