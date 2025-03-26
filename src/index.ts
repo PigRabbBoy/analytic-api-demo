@@ -151,16 +151,18 @@ const tracking = t.Object({
   enable: t.Boolean({ default: true }),
   config: t.Any({
     default: {
-      eventMappings: {
-        userData: "event:userdata",
-        pageView: "event:page:vioew",
-        ads: "event:ads",
-        buttonClick: "event:button:click",
-        chatOpen: "event:chat:open",
-      },
       autoTrackPageView: true,
       autoTrackButtonClick: true,
       clickOpenChatSelector: ["a#add-to-cart"],
+    },
+  }),
+  eventMappings: t.Any({
+    default: {
+      userData: "event:userdata",
+      pageView: "event:page:view",
+      ads: "event:ads",
+      buttonClick: "event:button:click",
+      chatOpen: "event:chat:open",
     },
   }),
 });
