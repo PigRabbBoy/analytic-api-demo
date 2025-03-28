@@ -40,7 +40,7 @@ const analyticObj = t.Object({
     })
   ),
   type: t.String({ default: "event:page:startChat" }),
-  buttonClick: t.Optional(t.Any()),
+  button: t.Optional(t.Any()),
   userData: t.Optional(t.Any()),
   ads: t.Optional(t.Any()),
   page: t.Optional(t.Any()),

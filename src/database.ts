@@ -10,7 +10,7 @@ export const analyticTable = sqliteTable("analytic", {
 
   // event data
   type: text(),
-  buttonClick: blob({ mode: "json" }),
+  button: blob({ mode: "json" }),
   userData: blob({ mode: "json" }),
   ads: blob({ mode: "json" }),
   page: blob({ mode: "json" }),
