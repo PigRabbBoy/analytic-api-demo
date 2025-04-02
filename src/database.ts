@@ -5,26 +5,26 @@ export const analyticTable = sqliteTable("analytic", {
   ohoPixelId: text("oho_pixel_id").notNull(),
   clientId: text("user_id").notNull(),
   sessionId: text("session_id"),
-  chatUser: blob({ mode: "json" }),
-  authUser: blob({ mode: "json" }),
+  chatUser: text({ mode: "json" }),
+  authUser: text({ mode: "json" }),
 
   // event data
   type: text(),
-  button: blob({ mode: "json" }),
-  userData: blob({ mode: "json" }),
-  ads: blob({ mode: "json" }),
-  page: blob({ mode: "json" }),
+  button: text({ mode: "json" }),
+  userData: text({ mode: "json" }),
+  ads: text({ mode: "json" }),
+  page: text({ mode: "json" }),
   timestamp: text(),
   createdAt: text("created_at"),
 });
 
 export const settingTable = sqliteTable("setting", {
   ohoPixelId: text("oho_pixel_id").primaryKey(),
-  livechat: blob({ mode: "json" }),
-  tracking: blob({ mode: "json" }),
+  livechat: text({ mode: "json" }),
+  tracking: text({ mode: "json" }),
 });
 
 export const domainWhitelistTable = sqliteTable("domain_whitelist", {
   ohoPixelId: text("oho_pixel_id").primaryKey(),
-  config: blob({ mode: "json" }).$type<string[]>(),
+  config: text({ mode: "json" }).$type<string[]>(),
 });
